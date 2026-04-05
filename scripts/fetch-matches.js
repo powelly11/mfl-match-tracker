@@ -42,13 +42,27 @@ async function extractShots(matchId) {
   const States = protobufRoot.lookupType('mfl.States');
   const shots = [];
   let lastShotHome = null, lastShotAway = null;
+  let emptyCount = 0;
 
-  for (let part = 1; part <= 10; part++) {
+  for (let part = 0; part <= 15; part++) {
     const res = await proxyFetch(`${MFL_CDN}/${matchId}/data/part-${part}.bin`);
-    if (!res) break;
+    if (!res) { emptyCount++; if (emptyCount >= 2) break; continue; }
     const buf = await res.arrayBuffer();
     const bytes = new Uint8Array(buf);
-    if (bytes[0] !== 10) break; // not valid protobuf
+    // Valid protobuf starts with field tag byte — field 1 (states), wire type 2 = byte 0x0A (10)
+    if (bytes.length < 4 || (bytes[0] !== 10 && bytes[0] !== 0x0a)) {
+      emptyCount++; if (emptyCount >= 2) break; continue;
+    }
+    emptyCount = 0;
+
+    let decoded;
+    try {
+      decoded = States.toObject(States.decode(bytes), { defaults: false });
+    } catch(e) {
+      console.warn(`  Part ${part} decode error: ${e.message} — skipping`);
+      continue;
+    }
+    if (!decoded.states?.length) break;
 
     const decoded = States.toObject(States.decode(bytes), { defaults: false });
     if (!decoded.states?.length) break;
