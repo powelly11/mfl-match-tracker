@@ -282,9 +282,57 @@ function transformPlayerStats(matchId, report, formations) {
 
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
+// ─── Backfill shots for matches missing shot data ────────────────────────────
+async function backfillShots() {
+  console.log('Checking for matches missing shot data...');
+
+  // Get matches that have 0 shots
+  const res = await fetch(
+    `${SUPABASE_URL}/rest/v1/mfl_matches?select=id&order=id.desc`,
+    { headers: hdrs }
+  );
+  if (!res.ok) throw new Error(`Supabase fetch error: ${res.status}`);
+  const allMatches = await res.json();
+
+  // Get match IDs that already have shots
+  const shotsRes = await fetch(
+    `${SUPABASE_URL}/rest/v1/mfl_match_shots?select=match_id&order=match_id.desc`,
+    { headers: hdrs }
+  );
+  if (!shotsRes.ok) throw new Error(`Supabase shots fetch error: ${shotsRes.status}`);
+  const shotsData = await shotsRes.json();
+  const matchesWithShots = new Set(shotsData.map(r => r.match_id));
+
+  const missing = allMatches.filter(m => !matchesWithShots.has(m.id));
+  console.log(`Found ${missing.length} matches missing shot data`);
+
+  let filled = 0;
+  for (const m of missing) {
+    console.log(`  Backfilling shots for match ${m.id}...`);
+    try {
+      const shots = await extractShots(m.id);
+      if (shots.length) {
+        const shotRows = shots.map(s => ({ ...s, match_id: m.id }));
+        await insertShots(shotRows);
+        console.log(`  ✓ Match ${m.id}: ${shots.length} shots added`);
+        filled++;
+      } else {
+        console.log(`  - Match ${m.id}: no shots found in binary`);
+      }
+    } catch(e) {
+      console.error(`  ✗ Match ${m.id} backfill failed: ${e.message}`);
+    }
+    await sleep(500);
+  }
+  console.log(`Backfill complete: ${filled} matches updated`);
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
   if (!SUPABASE_URL || !SUPABASE_KEY) throw new Error('Missing SUPABASE_URL or SUPABASE_KEY');
+
+  // Backfill shots for any matches missing them
+  await backfillShots();
 
   console.log('Fetching existing match IDs from Supabase...');
   const existingIds = await getExistingMatchIds();
