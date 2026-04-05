@@ -4,7 +4,6 @@ const PROXY = 'https://mfl-proxy.kustom2-02.workers.dev';
 const MFL_BASE = 'https://z519wdyajg.execute-api.us-east-1.amazonaws.com/prod';
 const MFL_CDN = 'https://d13e14gtps4iwl.cloudfront.net/matches';
 const LIMIT = 25;
-const DEBUG_MATCH_ID = 1958845; // Force reprocess this match for debugging
 
 const hdrs = {
   'apikey': SUPABASE_KEY,
@@ -64,16 +63,6 @@ async function extractShots(matchId) {
       continue;
     }
     if (!decoded.states?.length) break;
-
-    // Log unique event types from first part to verify schema
-    if (part === 1) {
-      const evTypes = new Set();
-      for (const state of decoded.states) {
-        if (state.events) state.events.forEach(ev => evTypes.add(ev.type));
-      }
-      console.log(`  Part 1 event types found: [${[...evTypes].sort((a,b)=>a-b).join(', ')}]`);
-      console.log(`  Part 1 states: ${decoded.states.length}`);
-    }
 
     for (const state of decoded.states) {
       if (!state.events) continue;
@@ -302,17 +291,6 @@ async function main() {
   console.log(`${existingIds.size} existing matches in database`);
 
   let newMatches = 0, newPlayerStats = 0, newShots = 0;
-
-  // DEBUG: force reprocess one match to check event types
-  if (DEBUG_MATCH_ID) {
-    console.log(`\nDEBUG: Reprocessing match ${DEBUG_MATCH_ID} to check binary event types...`);
-    try {
-      const shots = await extractShots(DEBUG_MATCH_ID);
-      console.log(`DEBUG: Found ${shots.length} shots in match ${DEBUG_MATCH_ID}`);
-    } catch(e) {
-      console.error(`DEBUG failed: ${e.message}`);
-    }
-  }
 
   let beforeMatchId = null;
   let done = false;
