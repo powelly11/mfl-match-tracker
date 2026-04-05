@@ -31,7 +31,7 @@ async function loadProtobuf() {
 // ─── Proxy fetch ─────────────────────────────────────────────────────────────
 async function proxyFetch(url) {
   const res = await fetch(`${PROXY}?url=${encodeURIComponent(url)}`);
-  if (res.status === 404) return null;
+  if (res.status === 404 || res.status === 403) return null;
   if (!res.ok) throw new Error(`Proxy error ${res.status} for ${url}`);
   return res;
 }
@@ -63,6 +63,16 @@ async function extractShots(matchId) {
       continue;
     }
     if (!decoded.states?.length) break;
+
+    // Log unique event types from first part to verify schema
+    if (part === 1) {
+      const evTypes = new Set();
+      for (const state of decoded.states) {
+        if (state.events) state.events.forEach(ev => evTypes.add(ev.type));
+      }
+      console.log(`  Part 1 event types found: [${[...evTypes].sort((a,b)=>a-b).join(', ')}]`);
+      console.log(`  Part 1 states: ${decoded.states.length}`);
+    }
 
     for (const state of decoded.states) {
       if (!state.events) continue;
@@ -341,7 +351,7 @@ async function main() {
         }
 
         newMatches++;
-        console.log(`  ✓ Match ${matchId}: ${shots.length} shots, ${report ? 22 : 0} player stats`);
+        console.log(`  ✓ Match ${matchId}: ${shots.length} shots, ${report ? report.home.playersStats.length + report.away.playersStats.length : 0} player stats`);
       } catch (e) {
         console.error(`  ✗ Match ${matchId} failed: ${e.message}`);
       }
