@@ -44,7 +44,7 @@ async function extractShots(matchId) {
   let lastShotHome = null, lastShotAway = null;
   let emptyCount = 0;
 
-  for (let part = 0; part <= 15; part++) {
+  for (let part = 1; part <= 15; part++) {
     const res = await proxyFetch(`${MFL_CDN}/${matchId}/data/part-${part}.bin`);
     if (!res) { emptyCount++; if (emptyCount >= 2) break; continue; }
     const buf = await res.arrayBuffer();
