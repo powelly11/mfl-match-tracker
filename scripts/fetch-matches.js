@@ -64,9 +64,6 @@ async function extractShots(matchId) {
     }
     if (!decoded.states?.length) break;
 
-    const decoded = States.toObject(States.decode(bytes), { defaults: false });
-    if (!decoded.states?.length) break;
-
     for (const state of decoded.states) {
       if (!state.events) continue;
       const time = state.time ?? 0;
